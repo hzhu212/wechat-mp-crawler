@@ -59,6 +59,9 @@ class Article(object):
         # index 为 0 表示头条文章，次条文章编号依次递增
         self.index = index
 
+    def __getitem__(self, key):
+        return getattr(self, key)
+
     def __str__(self):
         return str(self.__dict__)
 
@@ -71,7 +74,7 @@ def parse_fiddler_export(input_dir):
     历史文章列表一般以 json 文件保存，可直接载入并解析。
     但有个特例：home 页的列表保存在 html 内的一段脚本中，需要单独提取。
     """
-    for filename in os.listdir(input_dir):
+    for filename in sorted(os.listdir(input_dir)):
         ext = os.path.splitext(filename)[-1].lower()
         if ext not in ('.html', '.htm', '.json'):
             continue
@@ -87,6 +90,7 @@ def parse_fiddler_export(input_dir):
             # 原始字符串中包含 &nbsp; &quote; &amp; 等转移字符，需要解转义。
             json_str = html.unescape(json_str)
             obj = json.loads(json_str)
+            msg_list = obj['list']
 
         # 解析翻页 json 文件，获得后续历史文章列表
         elif ext == '.json':
@@ -128,12 +132,18 @@ def parse_fiddler_export(input_dir):
 
 
 def article_pipe(article_iter):
-    """对 article 的元信息进行处理。主要是对 url 解转义"""
+    """对文章列表进一步处理。
+    包括处理元信息（主要是对 url 解转义），按照时间倒排序等。
+    """
+    article_list = []
     for article in article_iter:
         for attr in ('cover_url', 'content_url', 'source_url'):
-            new_url = html.unescape(getattr(article, attr)).replace(r'\\/', '/')
+            new_url = html.unescape(getattr(article, attr)).replace(r'\/', '/')
             setattr(article, attr, new_url)
-        yield article
+        article_list.append(article)
+
+    article_list.sort(key=lambda article: article.datetime, reverse=True)
+    return article_list
 
 
 def get_comments(article, base_params, session):
@@ -238,7 +248,7 @@ def _create_comment_html(comments):
             reply_div = f'''
                 <div class="comment_meta" style="border-left: solid 3px #1AAD19;">
                     <span style="left: 0; padding-left: 5px;">作者</span>
-                    <span style="right: 0">👍 {comm['reply']['reply_like_num']}</span>
+                    <span style="right: 0">👍 {comm['reply'].get('reply_like_num', 0)}</span>
                 </div>
                 <div class="comment_content">{comm['reply']['content']}</div>
             '''
@@ -395,7 +405,7 @@ def main():
             with open(record_file, 'a', encoding='utf8') as f:
                 f.write(fingerprint + '\n')
 
-            time.sleep(random.random() * 6)
+            time.sleep(random.random() * 5)
 
 
 if __name__ == '__main__':
