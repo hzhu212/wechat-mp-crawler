@@ -133,7 +133,7 @@ def parse_fiddler_export(input_dir):
 
 def article_pipe(article_iter):
     """对文章列表进一步处理。
-    包括处理元信息（主要是对 url 解转义），按照时间倒排序等。
+    包括处理元信息（主要是对 url 解转义），按照时间、文章次序排序等。
     """
     article_list = []
     for article in article_iter:
@@ -142,7 +142,7 @@ def article_pipe(article_iter):
             setattr(article, attr, new_url)
         article_list.append(article)
 
-    article_list.sort(key=lambda article: article.datetime, reverse=True)
+    article_list.sort(key=lambda article: (article.datetime, article.index))
     return article_list
 
 
@@ -395,7 +395,7 @@ def main():
             print(f'文章包含 {len(comments)} 条评论。示例：{comments[:1]}')
             modify_content(article, comments, session)
 
-            filename = f'{article.datetime:%Y%m%d}-{article.title}.html'
+            filename = f'{article.datetime:%Y%m%d}-{article.index+1:02d}-{article.title}.html'
             filename = valid_filename(filename)
             with open(os.path.join(config['output_dir'], filename), 'w', encoding='utf8') as f:
                 f.write(article.content)
